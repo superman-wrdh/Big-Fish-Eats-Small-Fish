@@ -1,8 +1,9 @@
+
 export const GAME_WIDTH = window.innerWidth;
 export const GAME_HEIGHT = window.innerHeight;
 
 export const INITIAL_PLAYER_SIZE = 40; // width in pixels
-export const MAX_PLAYER_SIZE = 200;
+export const MAX_PLAYER_SIZE = 300;
 export const PLAYER_SPEED = 5;
 export const WINNING_SCORE = 5000; // Alternatively use size
 

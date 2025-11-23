@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { FishEntity, GameStatus, Particle, FishVariant } from './types';
 import { 
@@ -192,6 +193,14 @@ export default function App() {
         // Visuals for small fish
         const variants: FishVariant[] = ['round', 'standard', 'blocky'];
         variant = variants[Math.floor(Math.random() * variants.length)];
+    }
+
+    // --- CRITICAL FIX: ABSOLUTE SIZE CAP ---
+    // Force all enemies to be smaller than 90% of the MAX_PLAYER_SIZE.
+    // This guarantees that when the player reaches MAX_PLAYER_SIZE, 
+    // there are NO fish larger than the player on screen.
+    if (width > MAX_PLAYER_SIZE * 0.9) {
+        width = MAX_PLAYER_SIZE * 0.9;
     }
 
     const height = width * 0.6; // Keep aspect ratio roughly consistent
