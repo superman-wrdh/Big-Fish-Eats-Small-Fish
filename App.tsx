@@ -332,6 +332,7 @@ export default function App() {
           enemiesToRemove.add(enemy.id);
           playEatSound();
           
+          // Growth Logic: Coefficient is 0.1 of the enemy width
           const growth = enemy.width * 0.1;
           player.width += growth;
           player.height = player.width * 0.6;
@@ -471,7 +472,7 @@ export default function App() {
                 variant="standard"
                 />
                 <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-white font-bold text-sm drop-shadow-md whitespace-nowrap">
-                    YOU
+                    我
                 </div>
             </div>
 
@@ -479,7 +480,7 @@ export default function App() {
             <div className="absolute top-4 left-4 z-50 text-white font-bold text-2xl drop-shadow-md flex items-center gap-4">
                 <div className="flex items-center gap-2">
                     <Trophy className="text-yellow-400" />
-                    <span>Score: {score}</span>
+                    <span>积分: {score}</span>
                 </div>
                 <button 
                   onClick={toggleMute}
@@ -489,16 +490,16 @@ export default function App() {
                 </button>
             </div>
              <div className="absolute top-4 right-4 z-50 text-white font-bold text-lg drop-shadow-md flex flex-col items-end">
-                <span>Size: {Math.round(playerRef.current.width)} / {MAX_PLAYER_SIZE}</span>
-                <span className="text-sm opacity-80">Difficulty: {difficulty}</span>
+                <span>体积: {Math.round(playerRef.current.width)} / {MAX_PLAYER_SIZE}</span>
+                <span className="text-sm opacity-80">难度: {difficulty}</span>
             </div>
             
             {/* Standard Pause Screen (Only show if victory modal is NOT showing) */}
             {status === 'paused' && !showVictoryModal && (
                <div className="absolute inset-0 z-40 bg-black/30 flex items-center justify-center">
                    <div className="bg-black/70 text-white px-8 py-4 rounded-xl backdrop-blur text-2xl font-bold flex flex-col items-center gap-4">
-                        <span>PAUSED</span>
-                        <div className="text-sm font-normal text-gray-300">Press P to Resume</div>
+                        <span>暂停</span>
+                        <div className="text-sm font-normal text-gray-300">按 P 继续</div>
                         <button 
                             onClick={() => {
                                 setStatus('playing');
@@ -506,7 +507,7 @@ export default function App() {
                             }}
                             className="mt-2 bg-orange-500 hover:bg-orange-600 px-6 py-2 rounded-full text-base"
                         >
-                            Resume
+                            继续游戏
                         </button>
                    </div>
                </div>
@@ -519,10 +520,10 @@ export default function App() {
                         <Trophy className="w-32 h-32 text-yellow-300 mb-6 drop-shadow-[0_0_15px_rgba(253,224,71,0.5)] animate-pulse" />
                     </div>
                     <h2 className="text-6xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-yellow-200 via-yellow-400 to-yellow-600 mb-4 text-center">
-                        YOU ARE INVINCIBLE!
+                        你已经无敌了！
                     </h2>
                     <p className="text-2xl text-blue-100 mb-8 max-w-lg text-center">
-                        You have become the apex predator of the ocean.
+                        你成为了这片海洋的霸主。
                     </p>
                     <div className="flex gap-6">
                         <button
@@ -533,13 +534,13 @@ export default function App() {
                             }}
                             className="flex items-center px-8 py-4 bg-green-500 text-white rounded-full font-bold text-xl hover:bg-green-600 hover:scale-105 transition-all shadow-xl"
                         >
-                            <Play className="mr-2" /> Continue Playing
+                            <Play className="mr-2" /> 继续游戏
                         </button>
                         <button
                             onClick={() => { setStatus('start'); stopAmbience(); }}
                             className="flex items-center px-8 py-4 bg-white text-red-600 rounded-full font-bold text-xl hover:bg-gray-100 hover:scale-105 transition-all shadow-xl"
                         >
-                            <RefreshCw className="mr-2" /> End Game
+                            <RefreshCw className="mr-2" /> 结束游戏
                         </button>
                     </div>
                 </div>
@@ -551,21 +552,21 @@ export default function App() {
       {status === 'start' && (
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm">
           <h1 className="text-6xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-orange-500 mb-6 drop-shadow-lg">
-            Big Fish Eats Small Fish
+            大鱼吃小鱼
           </h1>
           <div className="bg-white/10 p-8 rounded-xl border border-white/20 text-center shadow-2xl w-[450px]">
             <p className="text-white text-lg mb-6 leading-relaxed">
-              Use <kbd className="bg-white/20 px-2 py-1 rounded">Arrow Keys</kbd> to move. <br/>
-              Eat smaller fish to grow. <br/>
-              Avoid bigger fish or get eaten!
+              使用 <kbd className="bg-white/20 px-2 py-1 rounded">方向键</kbd> 移动 <br/>
+              吃掉小鱼变大 <br/>
+              躲避大鱼生存
             </p>
             
             {/* Difficulty Slider */}
             <div className="mb-8 text-left">
                 <div className="flex justify-between text-white mb-2 font-bold">
-                    <span>Difficulty: {difficulty}</span>
+                    <span>难度: {difficulty}</span>
                     <span className="text-sm opacity-70 font-normal">
-                        {difficulty < 4 ? 'Easy' : difficulty < 8 ? 'Normal' : 'Hard'}
+                        {difficulty < 4 ? '简单' : difficulty < 8 ? '普通' : '困难'}
                     </span>
                 </div>
                 <input 
@@ -577,8 +578,8 @@ export default function App() {
                     className="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-orange-500"
                 />
                 <div className="flex justify-between text-xs text-gray-400 mt-1">
-                    <span>Few Enemies</span>
-                    <span>Chaos</span>
+                    <span>少量敌人</span>
+                    <span>极度混乱</span>
                 </div>
             </div>
 
@@ -586,7 +587,7 @@ export default function App() {
               onClick={() => resetGame()}
               className="group w-full relative inline-flex items-center justify-center px-8 py-3 text-lg font-bold text-white transition-all duration-200 bg-orange-500 font-pj rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-600 hover:bg-orange-600 hover:scale-105"
             >
-              <Play className="mr-2 w-6 h-6" /> Start Game
+              <Play className="mr-2 w-6 h-6" /> 开始游戏
             </button>
           </div>
         </div>
@@ -596,16 +597,16 @@ export default function App() {
       {status === 'gameover' && (
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-red-900/80 backdrop-blur-md animate-in fade-in duration-300">
           <Skull className="w-24 h-24 text-white mb-4 animate-bounce" />
-          <h2 className="text-5xl font-bold text-white mb-2">GAME OVER</h2>
-          <p className="text-xl text-red-200 mb-8">You were eaten by a bigger fish!</p>
+          <h2 className="text-5xl font-bold text-white mb-2">游戏结束</h2>
+          <p className="text-xl text-red-200 mb-8">你被大鱼吃掉了！</p>
           <div className="text-2xl text-white font-mono mb-8 bg-black/30 px-6 py-2 rounded-lg">
-             Final Score: {score}
+             最终得分: {score}
           </div>
           <button
             onClick={() => { setStatus('start'); stopAmbience(); }}
             className="flex items-center px-6 py-3 bg-white text-red-600 rounded-full font-bold hover:bg-gray-100 hover:scale-105 transition-all shadow-lg"
           >
-            <RefreshCw className="mr-2" /> Menu
+            <RefreshCw className="mr-2" /> 返回菜单
           </button>
         </div>
       )}
