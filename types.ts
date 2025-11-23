@@ -3,6 +3,8 @@ export interface Position {
   y: number;
 }
 
+export type FishVariant = 'standard' | 'round' | 'sharp' | 'blocky';
+
 export interface FishEntity {
   id: string;
   x: number;
@@ -13,6 +15,7 @@ export interface FishEntity {
   direction: 'left' | 'right';
   color: string;
   type: 'player' | 'enemy';
+  variant: FishVariant;
 }
 
 export type GameStatus = 'start' | 'playing' | 'paused' | 'gameover' | 'victory';

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { FishEntity, GameStatus, Particle } from './types';
+import { FishEntity, GameStatus, Particle, FishVariant } from './types';
 import { 
   GAME_WIDTH, 
   GAME_HEIGHT, 
@@ -23,7 +23,8 @@ export default function App() {
     speed: PLAYER_SPEED,
     direction: 'left',
     color: PLAYER_COLOR,
-    type: 'player'
+    type: 'player',
+    variant: 'standard'
   });
 
   const enemiesRef = useRef<FishEntity[]>([]);
@@ -32,6 +33,7 @@ export default function App() {
   const frameId = useRef<number>(0);
   const lastSpawnTime = useRef<number>(0);
   const scoreRef = useRef<number>(0);
+  const hasWonRef = useRef<boolean>(false); // Track if we've already triggered the win modal
   
   // Difficulty Ref (to access in loop without dependencies)
   const difficultyRef = useRef<number>(1);
@@ -46,6 +48,7 @@ export default function App() {
   const [score, setScore] = useState(0);
   const [difficulty, setDifficulty] = useState(1); // 1-10
   const [isMuted, setIsMuted] = useState(false);
+  const [showVictoryModal, setShowVictoryModal] = useState(false);
   
   // We use a dummy state to force re-render on every frame request
   const [, setTick] = useState(0);
@@ -143,40 +146,57 @@ export default function App() {
   // --- Helpers ---
   
   const spawnEnemy = useCallback(() => {
+    // 1. GLOBAL POPULATION CAP
+    // Don't clutter the screen. Max 25 enemies total.
+    if (enemiesRef.current.length >= 25) return;
+
+    const playerSize = playerRef.current.width;
+    const diff = difficultyRef.current;
+
+    // 2. DANGEROUS FISH CAP
+    // Calculate how many fish are bigger than the player
+    const dangerousFishCount = enemiesRef.current.filter(e => e.width > playerSize).length;
+    
+    // Allowed dangerous fish increases slightly with difficulty, but capped reasonably.
+    // Level 1: 2 big fish max. Level 10: 5 big fish max.
+    const maxDangerousAllowed = 2 + Math.floor(diff / 3);
+    const canSpawnDangerous = dangerousFishCount < maxDangerousAllowed;
+
     const isLeft = Math.random() > 0.5;
     const direction = isLeft ? 'right' : 'left';
     const startX = isLeft ? -150 : GAME_WIDTH + 150;
     const startY = Math.random() * (GAME_HEIGHT - 50) + 25;
     
-    // Difficulty influences size probabilities
-    // Diff 1: Mostly small/equal. Diff 10: Mostly dangerous.
-    const diff = difficultyRef.current;
-    
-    // Probability of spawning a "Dangerous" (Bigger) fish
-    // Range: 0.1 (Diff 1) to 0.6 (Diff 10)
-    const dangerChance = 0.1 + (diff * 0.055); 
-    
-    const playerSize = playerRef.current.width;
-    const sizeRoll = Math.random();
     let width;
-    
-    if (sizeRoll < dangerChance) {
-        // Danger: Bigger than player
-        // Min 1.1x player size, Max depends on difficulty (up to 3x at max diff)
-        const maxScale = 1.2 + (diff * 0.2);
-        width = playerSize * (1.1 + Math.random() * (maxScale - 1.1));
+    let variant: FishVariant = 'standard';
+
+    // Decide Size
+    const spawnRoll = Math.random();
+    // Probability of trying to spawn a big fish based on difficulty (0.1 to 0.5)
+    const tryBigSpawn = spawnRoll < (0.1 + diff * 0.04);
+
+    if (tryBigSpawn && canSpawnDangerous) {
+        // Spawn Dangerous Fish
+        // Cap size at 1.9x player size (Never double)
+        // Min size 1.1x
+        const sizeMultiplier = 1.1 + Math.random() * 0.8; 
+        width = playerSize * sizeMultiplier;
+        
+        // Visuals for big fish
+        variant = Math.random() > 0.5 ? 'sharp' : 'blocky';
     } else {
-        // Food or Neutral: Smaller or same size
-        // 60% chance of being food (smaller) within this bracket
-        if (Math.random() < 0.6) {
-            width = Math.max(15, playerSize * (0.3 + Math.random() * 0.6)); // 0.3x to 0.9x
-        } else {
-            width = playerSize * (0.9 + Math.random() * 0.15); // 0.9x to 1.05x
-        }
+        // Spawn Food (Smaller)
+        // Size between 0.3x and 0.9x of player
+        width = Math.max(15, playerSize * (0.3 + Math.random() * 0.6));
+        
+        // Visuals for small fish
+        const variants: FishVariant[] = ['round', 'standard', 'blocky'];
+        variant = variants[Math.floor(Math.random() * variants.length)];
     }
 
-    const height = width * 0.6;
-    // Speed increases slightly with difficulty
+    const height = width * 0.6; // Keep aspect ratio roughly consistent
+    
+    // Speed
     const speedBase = 2 + (diff * 0.3);
     const speed = (speedBase + Math.random() * 3) * (GAME_WIDTH / 1920);
 
@@ -189,7 +209,8 @@ export default function App() {
       speed,
       direction,
       color: FISH_COLORS[Math.floor(Math.random() * FISH_COLORS.length)],
-      type: 'enemy'
+      type: 'enemy',
+      variant
     };
 
     enemiesRef.current.push(newEnemy);
@@ -220,6 +241,8 @@ export default function App() {
   const resetGame = () => {
     // Sync ref
     difficultyRef.current = difficulty;
+    hasWonRef.current = false;
+    setShowVictoryModal(false);
 
     playerRef.current = {
       id: 'player',
@@ -230,7 +253,8 @@ export default function App() {
       speed: PLAYER_SPEED,
       direction: 'left',
       color: PLAYER_COLOR,
-      type: 'player'
+      type: 'player',
+      variant: 'standard'
     };
     enemiesRef.current = [];
     scoreRef.current = 0;
@@ -273,8 +297,8 @@ export default function App() {
 
     // 2. Spawn Enemies
     // Calculate spawn interval based on difficulty. 
-    // Diff 1: ~1500ms, Diff 10: ~400ms
-    const spawnInterval = Math.max(400, 1600 - (difficultyRef.current * 120));
+    // Diff 1: ~1500ms, Diff 10: ~600ms (Slightly slower spawn rate overall to reduce chaos)
+    const spawnInterval = Math.max(600, 1600 - (difficultyRef.current * 100));
     
     if (time - lastSpawnTime.current > spawnInterval) {
        spawnEnemy();
@@ -316,9 +340,13 @@ export default function App() {
           scoreRef.current += points;
           setScore(scoreRef.current);
           
-          if (player.width >= MAX_PLAYER_SIZE) {
-            setStatus('victory');
-            stopAmbience();
+          // WIN CONDITION (One-time trigger)
+          if (player.width >= MAX_PLAYER_SIZE && !hasWonRef.current) {
+            hasWonRef.current = true;
+            setStatus('paused');
+            setShowVictoryModal(true);
+            // Optionally pause ambience or not. Let's keep it running for immersion or stop if you prefer 'freeze'.
+            // stopAmbience(); 
           }
         } else {
           // DIE
@@ -345,7 +373,7 @@ export default function App() {
              stopAmbience();
              return 'paused';
           }
-          if (prev === 'paused') {
+          if (prev === 'paused' && !showVictoryModal) { // Only allow unpause via P if not in victory modal
              startAmbience();
              return 'playing';
           }
@@ -366,7 +394,7 @@ export default function App() {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [stopAmbience, startAmbience]);
+  }, [stopAmbience, startAmbience, showVictoryModal]);
 
 
   // --- Lifecycle ---
@@ -418,7 +446,8 @@ export default function App() {
                     width={enemy.width} 
                     height={enemy.height} 
                     color={enemy.color} 
-                    direction={enemy.direction} 
+                    direction={enemy.direction}
+                    variant={enemy.variant}
                 />
                 </div>
             ))}
@@ -439,6 +468,7 @@ export default function App() {
                 color={playerRef.current.color} 
                 direction={playerRef.current.direction} 
                 isPlayer
+                variant="standard"
                 />
                 <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-white font-bold text-sm drop-shadow-md whitespace-nowrap">
                     YOU
@@ -463,7 +493,8 @@ export default function App() {
                 <span className="text-sm opacity-80">Difficulty: {difficulty}</span>
             </div>
             
-            {status === 'paused' && (
+            {/* Standard Pause Screen (Only show if victory modal is NOT showing) */}
+            {status === 'paused' && !showVictoryModal && (
                <div className="absolute inset-0 z-40 bg-black/30 flex items-center justify-center">
                    <div className="bg-black/70 text-white px-8 py-4 rounded-xl backdrop-blur text-2xl font-bold flex flex-col items-center gap-4">
                         <span>PAUSED</span>
@@ -479,6 +510,39 @@ export default function App() {
                         </button>
                    </div>
                </div>
+            )}
+
+            {/* INVINCIBLE MODAL */}
+            {status === 'paused' && showVictoryModal && (
+                <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-blue-900/80 backdrop-blur-md animate-in fade-in duration-300">
+                    <div className="relative">
+                        <Trophy className="w-32 h-32 text-yellow-300 mb-6 drop-shadow-[0_0_15px_rgba(253,224,71,0.5)] animate-pulse" />
+                    </div>
+                    <h2 className="text-6xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-yellow-200 via-yellow-400 to-yellow-600 mb-4 text-center">
+                        YOU ARE INVINCIBLE!
+                    </h2>
+                    <p className="text-2xl text-blue-100 mb-8 max-w-lg text-center">
+                        You have become the apex predator of the ocean.
+                    </p>
+                    <div className="flex gap-6">
+                        <button
+                            onClick={() => { 
+                                setShowVictoryModal(false);
+                                setStatus('playing'); 
+                                startAmbience(); // Ensure sound is on if it was stopped or paused
+                            }}
+                            className="flex items-center px-8 py-4 bg-green-500 text-white rounded-full font-bold text-xl hover:bg-green-600 hover:scale-105 transition-all shadow-xl"
+                        >
+                            <Play className="mr-2" /> Continue Playing
+                        </button>
+                        <button
+                            onClick={() => { setStatus('start'); stopAmbience(); }}
+                            className="flex items-center px-8 py-4 bg-white text-red-600 rounded-full font-bold text-xl hover:bg-gray-100 hover:scale-105 transition-all shadow-xl"
+                        >
+                            <RefreshCw className="mr-2" /> End Game
+                        </button>
+                    </div>
+                </div>
             )}
         </>
       )}
@@ -542,30 +606,6 @@ export default function App() {
             className="flex items-center px-6 py-3 bg-white text-red-600 rounded-full font-bold hover:bg-gray-100 hover:scale-105 transition-all shadow-lg"
           >
             <RefreshCw className="mr-2" /> Menu
-          </button>
-        </div>
-      )}
-
-      {/* Victory Screen */}
-      {status === 'victory' && (
-        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-blue-900/80 backdrop-blur-md animate-in fade-in duration-300">
-           <div className="relative">
-             <Trophy className="w-32 h-32 text-yellow-300 mb-6 drop-shadow-[0_0_15px_rgba(253,224,71,0.5)] animate-pulse" />
-           </div>
-          <h2 className="text-6xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-yellow-200 via-yellow-400 to-yellow-600 mb-4">
-            YOU ARE INVINCIBLE!
-          </h2>
-          <p className="text-2xl text-blue-100 mb-8 max-w-lg text-center">
-            You have become the apex predator of the ocean.
-          </p>
-           <div className="text-3xl text-white font-mono mb-8 bg-black/30 px-8 py-3 rounded-lg border border-yellow-500/30">
-             Score: {score}
-          </div>
-          <button
-            onClick={() => { setStatus('start'); stopAmbience(); }}
-            className="flex items-center px-8 py-4 bg-yellow-500 text-blue-900 rounded-full font-bold text-xl hover:bg-yellow-400 hover:scale-105 transition-all shadow-xl"
-          >
-            <RefreshCw className="mr-2" /> Play Again
           </button>
         </div>
       )}
