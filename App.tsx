@@ -11,7 +11,7 @@ import {
   PLAYER_COLOR 
 } from './constants';
 import { FishIcon } from './components/FishIcon';
-import { Play, Pause, RefreshCw, Trophy, Skull, Volume2, VolumeX } from 'lucide-react';
+import { Play, Pause, RefreshCw, Trophy, Skull, Volume2, VolumeX, AlertTriangle } from 'lucide-react';
 
 export default function App() {
   // --- Game State Refs (Mutable for performance in loop) ---
@@ -33,6 +33,7 @@ export default function App() {
   const keysPressed = useRef<Set<string>>(new Set());
   const frameId = useRef<number>(0);
   const lastSpawnTime = useRef<number>(0);
+  const lastFrameTimeRef = useRef<number>(0); // New: Track frame time for smooth decay
   const scoreRef = useRef<number>(0);
   const hasWonRef = useRef<boolean>(false); // Track if we've already triggered the win modal
   
@@ -252,6 +253,7 @@ export default function App() {
     difficultyRef.current = difficulty;
     hasWonRef.current = false;
     setShowVictoryModal(false);
+    lastFrameTimeRef.current = performance.now();
 
     playerRef.current = {
       id: 'player',
@@ -285,8 +287,29 @@ export default function App() {
   const update = useCallback((time: number) => {
     if (status !== 'playing') return;
 
+    // Calculate Delta Time (in ms)
+    // Handle first frame case or resume from pause
+    if (lastFrameTimeRef.current === 0) lastFrameTimeRef.current = time;
+    const deltaTime = time - lastFrameTimeRef.current;
+    
+    // Safety check: if delta is huge (e.g. tab switch/lag), cap it to avoid glitches
+    const safeDelta = deltaTime > 200 ? 16 : deltaTime;
+    
+    lastFrameTimeRef.current = time;
+
     // 1. Update Player
     const player = playerRef.current;
+    
+    // --- SPECIAL RULE: Max Difficulty Decay ---
+    // If Difficulty is 10 AND size > 100, reduce size by 0.5 per second
+    if (difficultyRef.current === 10 && player.width > 100) {
+        // 0.5 pixels per second. 
+        // safeDelta is in ms. (safeDelta / 1000) is seconds.
+        const decayAmount = 0.5 * (safeDelta / 1000);
+        player.width = Math.max(100, player.width - decayAmount);
+        player.height = player.width * 0.6;
+    }
+
     let dx = 0;
     let dy = 0;
 
@@ -411,6 +434,8 @@ export default function App() {
 
   useEffect(() => {
     if (status === 'playing') {
+      // Reset timer when starting/resuming to prevent decay jumps
+      lastFrameTimeRef.current = performance.now();
       frameId.current = requestAnimationFrame(update);
     }
     return () => cancelAnimationFrame(frameId.current);
@@ -501,6 +526,13 @@ export default function App() {
              <div className="absolute top-4 right-4 z-50 text-white font-bold text-lg drop-shadow-md flex flex-col items-end">
                 <span>体积: {Math.round(playerRef.current.width)} / {MAX_PLAYER_SIZE}</span>
                 <span className="text-sm opacity-80">难度: {difficulty}</span>
+                {/* Max Difficulty Hardcore UI */}
+                {difficulty === 10 && (
+                   <span className="text-red-300 text-xs mt-1 animate-pulse flex items-center gap-1">
+                      <AlertTriangle size={12} />
+                      体积减少: -0.5/秒 (当 {'>'} 100)
+                   </span>
+                )}
             </div>
             
             {/* Standard Pause Screen (Only show if victory modal is NOT showing) */}
@@ -590,6 +622,12 @@ export default function App() {
                     <span>少量敌人</span>
                     <span>极度混乱</span>
                 </div>
+                {difficulty === 10 && (
+                     <div className="mt-2 text-xs text-red-300 flex items-center gap-1 justify-center bg-red-900/40 p-1 rounded">
+                        <AlertTriangle size={12} />
+                        <div>最高难度警告: 体积会自动减少！</div>
+                    </div>
+                )}
             </div>
 
             <button
